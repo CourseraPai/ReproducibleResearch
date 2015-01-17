@@ -1,0 +1,153 @@
+---
+title: "Reproducible Research - Peer Assignment 1"
+output: html_document
+---  
+
+### Before we start
+
+
+
+-Download the zip file from [https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip]  
+-Save the zip file to a local directory.  
+-Unzip and Extract the file "activity.csv" into your current  R Studio working directory     
+
+  
+### Loading and preprocessing the data    
+####1.Load the data  
+The following r code will load the data as a dataframe.Make sure "activity.csv" is in your current working directory
+
+
+
+```{r echo=TRUE}
+withNA <- read.csv("activity.csv", header=TRUE)
+df <- read.csv("activity.csv", header=TRUE)
+
+```    
+####2.Data Preprocessing  
+
+Check if "steps" column is integer 
+```{r echo=TRUE}
+
+sapply(withNA,typeof)
+
+```    
+Create a dataframe with all NA data removed  
+```{r echo=TRUE}
+
+withoutNA<-withNA[complete.cases(withNA),]
+
+```    
+  
+###Mean total number of steps per day
+####1.Histogram of the Total Steps taken per day
+```{r echo=TRUE}
+totalsteps<-aggregate(withoutNA$steps ~ withoutNA$date, data=withoutNA, FUN=sum)
+names(totalsteps)<-c("date","steps")
+```
+
+```{r message=FALSE}
+attach(totalsteps)
+```
+
+```{r echo=TRUE}
+hist(steps,main="Total Steps per Day",xlab="Total steps",col="lightgreen")
+```
+    
+####2.Mean and Median of total steps per day
+```{r echo=TRUE}
+meansteps<-aggregate(withoutNA$steps ~ withoutNA$date, data=withoutNA, FUN=mean)
+mediansteps<-aggregate(withoutNA$steps ~ withoutNA$date, data=withoutNA, FUN=median)
+```
+
+
+###Average daily activity pattern
+```{r}
+stepsbyinterval<-aggregate(withoutNA$steps ~ withoutNA$interval, data=withoutNA, FUN=mean)
+names(stepsbyinterval)<-c("interval","steps")
+```
+
+```{r message=FALSE}
+attach(stepsbyinterval)
+```
+####1. Time series plot of the interval and average number of steps taken
+
+```{r echo=TRUE}
+plot(interval, steps, type="l",main="Interval vs Average steps taken", xlab= "Interval", ylab= "Average steps", col="blue" , lwd=2)
+```  
+    
+####2. 5-minute interval that contains the maximum number of steps
+
+```{r echo=TRUE}
+stepsbyinterval[order(-steps),][1,]
+```
+     
+###Impute missing values  
+####1.Total number of rows with missing values
+```{r=TRUE}
+nrow(withNA)-nrow(withoutNA)
+```
+
+  
+####2.Strategy for filling the missing values
+-Write a function to compute mean  
+-Using plyr package and ddply function replace NA of steps column with the mean steps for that given interval
+  
+```{r echo=TRUE}
+library(plyr)
+meanfunc <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+```
+
+####3.Create dataset with missing data filled in
+```{r echo = TRUE}
+filledNA<-(ddply(withNA, ~ interval, transform,  steps= meanfunc(steps)))
+```
+
+####4.Histogram, Mean and Median for new data with NA values filled  
+```{r echo=TRUE}
+totalsteps<-aggregate(filledNA$steps ~ filledNA$date, data=filledNA, FUN=sum)
+names(totalsteps)<-c("date","steps")
+```
+
+```{r message=FALSE}
+attach(totalsteps)
+```
+
+```{r echo=TRUE}
+hist(steps,main="Total Steps per Day for data with filled NA values",xlab="Total steps",col="lightblue")
+```
+
+```{r echo=TRUE}
+meansteps<-aggregate(filledNA$steps ~ filledNA$date, data=filledNA, FUN=mean)
+mediansteps<-aggregate(filledNA$steps ~ filledNA$date, data=filledNA, FUN=median)
+```
+
+####5.Impact of imputing missing data
+The following summaries show that imputing missing data has no effect on the actual data
+
+```{r echo=TRUE}
+
+summary(withoutNA)
+summary(filledNA)
+
+```
+
+###Activity patterns - weekdays and Weekends  
+####1.Creating a factor variable to indicate "Weekday" and "Weekend"
+
+```{r}
+
+filledNA$Daytype<-ifelse(weekdays(as.Date(filledNA$date)) %in% c('Sunday','Saturday'), 'Weekend', 'Weekday')
+```
+     
+####2.Panel plot - time series plot of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days
+
+```{r echo=TRUE}
+
+library(lattice)
+aggavg<-aggregate(filledNA$steps ~ filledNA$Daytype+filledNA$interval, data=filledNA, FUN=mean)
+names(aggavg)<-c("Daytype","Interval","Steps")
+xyplot(Steps~Interval|Daytype, group=Daytype, data=aggavg, type="l",layout=c(1,2))
+
+```
+
+
